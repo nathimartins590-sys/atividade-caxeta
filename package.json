@@ -1,0 +1,31 @@
+{
+  "name": "atividade-caxeta",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/nathimartins590-sys/atividade-caxeta#readme",
+  "bugs": {
+    "url": "https://github.com/nathimartins590-sys/atividade-caxeta/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nathimartins590-sys/atividade-caxeta.git"
+  },
+  "license": "ISC",
+  "author": "Nathalia",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "cross-env TEST=true node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "dev": "node --watch index.js",
+    "prod": "node index.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "swagger-jsdoc": "^6.3.0",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "jest": "^30.5.1",
+    "supertest": "^7.2.2"
+  }
+}
