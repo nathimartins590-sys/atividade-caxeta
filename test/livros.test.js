@@ -1,138 +1,335 @@
-// livros.test.js
 import request from "supertest";
 import app from "../app.js";
 
-test("POST /livros cria um novo livro", async () => {
-  const resposta = await request(app).post("/livros")
-    .send({ titulo: "Drácula", autor: " Bram Stoker" });
+describe("GET /livros", () => {
+  test("lista todos os livros cadastrados", async () => {
+    const resposta = await request(app).get("/livros");
 
-  expect(resposta.status).toBe(201);
-  expect(resposta.body.titulo).toBe("Drácula");
-});
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.length).toBeGreaterThanOrEqual(2);
+  });
 
-test("POST /livros retorna erro ao não informar o autor", async () => {
-  const resposta = await request(app).post("/livros")
-    .send({ titulo: "Drácula" });
+  test("filtra por título, sem diferenciar maiúsculas", async () => {
+    const resposta = await request(app).get("/livros").query({ titulo: "ESCARAVELHO" });
 
-  expect(resposta.status).toBe(400);
-  expect(resposta.body.error).toBe("Autor é obrigatório");
-});
+    expect(resposta.status).toBe(200);
+    expect(resposta.body[0].titulo).toBe("O escaravelho do diabo");
+  });
 
+  test("filtra por autor", async () => {
+    const resposta = await request(app).get("/livros").query({ autor: "Machado" });
 
-test("GET /livros  filtra livros pelo título", async () => {
-  const resposta = await request(app).get("/livros")
-    .send("titulo=escaravelho");
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.every(l => l.autor.toLowerCase().includes("machado"))).toBe(true);
+  });
 
-  expect(resposta.status).toBe(200);
-  expect(resposta.body[0].titulo).toBe("O escaravelho do diabo");
-});
+  test("filtra por disponivel", async () => {
+    const resposta = await request(app).get("/livros").query({ disponivel: "false" });
 
-test("GET /livros dois livros já cadastrados", async () => {
-  const resposta = await request(app).get("/livros")
-    .send();
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.every(l => l.disponivel === false)).toBe(true);
+  });
 
-  expect(resposta.status).toBe(200);
-  expect(resposta.body.length).toBe(3);
-});
+  test("filtra por genero", async () => {
+    const resposta = await request(app).get("/livros").query({ genero: "Romance" });
 
-test("GET /livros filtra por título sem diferenciar maiúsculas", async () => {
-  const resposta = await request(app).get("/livros")
-    .query({ titulo: "DRÁCULA" });
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.every(l => l.genero === "Romance")).toBe(true);
+  });
 
-  expect(resposta.status).toBe(200);
-  expect(resposta.body).toHaveLength(1);
-  expect(resposta.body[0].titulo).toBe("Drácula");
-});
+  test("ordena por titulo", async () => {
+    const resposta = await request(app).get("/livros").query({ ordenar: "titulo" });
 
-test("GET /livros retorna lista vazia quando não encontra o título", async () => {
-  const resposta = await request(app).get("/livros")
-    .query({ titulo: "livro inexistente" });
+    const titulos = resposta.body.map(l => l.titulo);
+    const titulosOrdenados = [...titulos].sort((a, b) => a.localeCompare(b));
 
-  expect(resposta.status).toBe(200);
-  expect(resposta.body).toEqual([]);
-});
+    expect(resposta.status).toBe(200);
+    expect(titulos).toEqual(titulosOrdenados);
+  });
 
-test("GET /livros/:id retorna o livro encontrado", async () => {
-  const resposta = await request(app).get("/livros/1");
+  test("ordena por autor", async () => {
+    const resposta = await request(app).get("/livros").query({ ordenar: "autor" });
 
-  expect(resposta.status).toBe(200);
-  expect(resposta.body.id).toBe(1);
-});
+    const autores = resposta.body.map(l => l.autor);
+    const autoresOrdenados = [...autores].sort((a, b) => a.localeCompare(b));
 
-test("GET /livros/:id retorna erro quando o livro não existe", async () => {
-  const resposta = await request(app).get("/livros/999");
+    expect(resposta.status).toBe(200);
+    expect(autores).toEqual(autoresOrdenados);
+  });
 
-  expect(resposta.status).toBe(404);
-  expect(resposta.body).toEqual({ error: "livro não foi encontrado" });
-});
+  test("aplica pagina e limite", async () => {
+    const resposta = await request(app).get("/livros").query({ pagina: 1, limite: 1 });
 
-test("POST /livros retorna erro quando o título não é informado", async () => {
-  const resposta = await request(app).post("/livros")
-    .send({ autor: "Autor sem título" });
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.length).toBe(1);
+  });
 
-  expect(resposta.status).toBe(400);
-  expect(resposta.body.error).toBe("Título é obrigatório");
-});
+  test("retorna lista vazia quando o filtro não encontra nada", async () => {
+    const resposta = await request(app).get("/livros").query({ titulo: "livro que não existe" });
 
-test("POST /livros aceita disponibilidade informada", async () => {
-  const resposta = await request(app).post("/livros")
-    .send({ titulo: "Livro disponível", autor: "Autor", disponivel: true });
-
-  expect(resposta.status).toBe(201);
-  expect(resposta.body.disponviel).toBe(true);
-});
-
-test("POST /livros usa indisponibilidade quando ela não é informada", async () => {
-  const resposta = await request(app).post("/livros")
-    .send({ titulo: "Livro sem disponibilidade", autor: "Autor", disponivel: false });
-
-  expect(resposta.status).toBe(201);
-  expect(resposta.body.disponviel).toBe(false);
-});
-
-test("PUT /livros/:id atualiza os campos informados", async () => {
-  const resposta = await request(app).put("/livros/1")
-    .send({ titulo: "Título atualizado", autor: "Novo autor", disponivel: true });
-
-  expect(resposta.status).toBe(200);
-  expect(resposta.body).toMatchObject({
-    id: 1,
-    titulo: "Título atualizado",
-    autor: "Novo autor",
-    disponivel: true
+    expect(resposta.status).toBe(200);
+    expect(resposta.body).toEqual([]);
   });
 });
 
-test("PUT /livros/:id preserva os campos quando recebem valores vazios ou falsos", async () => {
-  const resposta = await request(app).put("/livros/1")
-    .send({ titulo: "", autor: "", disponivel: false });
+describe("GET /livros/:id", () => {
+  test("retorna o livro encontrado", async () => {
+    const resposta = await request(app).get("/livros/1");
 
-  expect(resposta.status).toBe(200);
-  expect(resposta.body).toMatchObject({
-    titulo: "Título atualizado",
-    autor: "Novo autor",
-    disponivel: true
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.id).toBe(1);
+  });
+
+  test("retorna erro quando o livro não existe", async () => {
+    const resposta = await request(app).get("/livros/999");
+
+    expect(resposta.status).toBe(404);
   });
 });
 
-test("PUT /livros/:id retorna erro quando o livro não existe", async () => {
-  const resposta = await request(app).put("/livros/999")
-    .send({ titulo: "Título" });
+describe("POST /livros", () => {
+  test("cria um novo livro", async () => {
+    const resposta = await request(app)
+      .post("/livros")
+      .send({ titulo: "Drácula", autor: "Bram Stoker", genero: "Terror" });
 
-  expect(resposta.status).toBe(404);
-  expect(resposta.body).toEqual({ error: "Livro não encontrado" });
+    expect(resposta.status).toBe(201);
+    expect(resposta.body.titulo).toBe("Drácula");
+    expect(resposta.body.disponivel).toBe(false);
+  });
+
+  test("aceita disponivel informado como true", async () => {
+    const resposta = await request(app)
+      .post("/livros")
+      .send({ titulo: "Livro disponível", autor: "Autor Teste", disponivel: true });
+
+    expect(resposta.status).toBe(201);
+    expect(resposta.body.disponivel).toBe(true);
+  });
+
+  test("retorna erro quando o título não é informado", async () => {
+    const resposta = await request(app).post("/livros").send({ autor: "Autor sem título" });
+
+    expect(resposta.status).toBe(400);
+    expect(resposta.body.errors).toContain("Título é obrigatório");
+  });
+
+  test("retorna erro quando o autor não é informado", async () => {
+    const resposta = await request(app).post("/livros").send({ titulo: "Sem autor" });
+
+    expect(resposta.status).toBe(400);
+    expect(resposta.body.errors).toContain("Autor é obrigatório");
+  });
+
+  test("retorna erro quando o título passa do tamanho máximo", async () => {
+    const tituloGigante = "a".repeat(201);
+    const resposta = await request(app)
+      .post("/livros")
+      .send({ titulo: tituloGigante, autor: "Autor Teste" });
+
+    expect(resposta.status).toBe(400);
+    expect(resposta.body.errors).toContain("Título muito longo (máx 200 caracteres)");
+  });
+
+  test("retorna erro quando o autor passa do tamanho máximo", async () => {
+    const autorGigante = "a".repeat(101);
+    const resposta = await request(app)
+      .post("/livros")
+      .send({ titulo: "Livro Teste", autor: autorGigante });
+
+    expect(resposta.status).toBe(400);
+    expect(resposta.body.errors).toContain("Autor muito longo (máx 100 caracteres)");
+  });
+
+  test("retorna erro quando disponivel não é booleano", async () => {
+    const resposta = await request(app)
+      .post("/livros")
+      .send({ titulo: "Livro Teste", autor: "Autor Teste", disponivel: "sim" });
+
+    expect(resposta.status).toBe(400);
+    expect(resposta.body.errors).toContain("Campo 'disponivel' deve ser booleano");
+  });
 });
 
-test("DELETE /livros/:id remove o livro encontrado", async () => {
-  const resposta = await request(app).delete("/livros/4");
+describe("PUT /livros/:id", () => {
+  test("atualiza os campos informados", async () => {
+    const criado = await request(app)
+      .post("/livros")
+      .send({ titulo: "Original", autor: "Autor Original", disponivel: true });
 
-  expect(resposta.status).toBe(204);
-  expect(resposta.body).toEqual({});
+    const resposta = await request(app)
+      .put(`/livros/${criado.body.id}`)
+      .send({ titulo: "Atualizado", autor: "Novo Autor", disponivel: false });
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body).toMatchObject({
+      titulo: "Atualizado",
+      autor: "Novo Autor",
+      disponivel: false
+    });
+  });
+
+  test("preserva os campos quando recebem string vazia", async () => {
+    const criado = await request(app)
+      .post("/livros")
+      .send({ titulo: "Mantido", autor: "Autor Mantido" });
+
+    const resposta = await request(app)
+      .put(`/livros/${criado.body.id}`)
+      .send({ titulo: "", autor: "" });
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.titulo).toBe("Mantido");
+    expect(resposta.body.autor).toBe("Autor Mantido");
+  });
+
+  test("atualiza o genero quando informado", async () => {
+    const criado = await request(app)
+      .post("/livros")
+      .send({ titulo: "Livro sem genero", autor: "Autor" });
+
+    const resposta = await request(app)
+      .put(`/livros/${criado.body.id}`)
+      .send({ genero: "Ficção" });
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.genero).toBe("Ficção");
+  });
+
+  test("retorna erro quando o livro não existe", async () => {
+    const resposta = await request(app).put("/livros/999").send({ titulo: "Título" });
+
+    expect(resposta.status).toBe(404);
+  });
 });
 
-test("DELETE /livros/:id retorna erro quando o livro não existe", async () => {
-  const resposta = await request(app).delete("/livros/999");
+describe("DELETE /livros/:id", () => {
+  test("remove o livro encontrado", async () => {
+    const criado = await request(app)
+      .post("/livros")
+      .send({ titulo: "Livro descartável", autor: "Autor" });
 
-  expect(resposta.status).toBe(404);
-  expect(resposta.body).toEqual({ error: "Livro não foi encontrado" });
+    const resposta = await request(app).delete(`/livros/${criado.body.id}`);
+
+    expect(resposta.status).toBe(204);
+
+    const busca = await request(app).get(`/livros/${criado.body.id}`);
+    expect(busca.status).toBe(404);
+  });
+
+  test("retorna erro quando o livro não existe", async () => {
+    const resposta = await request(app).delete("/livros/999");
+
+    expect(resposta.status).toBe(404);
+  });
+});
+
+describe("POST /livros/:id/emprestar e /devolver", () => {
+  test("empresta um livro disponível", async () => {
+    const criado = await request(app)
+      .post("/livros")
+      .send({ titulo: "Livro para emprestar", autor: "Autor", disponivel: true });
+
+    const resposta = await request(app)
+      .post(`/livros/${criado.body.id}/emprestar`)
+      .send({ usuario: "Nathalia" });
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.disponivel).toBe(false);
+  });
+
+  test("não permite emprestar um livro indisponível", async () => {
+    const criado = await request(app)
+      .post("/livros")
+      .send({ titulo: "Livro indisponível", autor: "Autor", disponivel: false });
+
+    const resposta = await request(app).post(`/livros/${criado.body.id}/emprestar`);
+
+    expect(resposta.status).toBe(400);
+  });
+
+  test("retorna erro ao emprestar livro inexistente", async () => {
+    const resposta = await request(app).post("/livros/999/emprestar");
+
+    expect(resposta.status).toBe(404);
+  });
+
+  test("devolve um livro emprestado", async () => {
+    const criado = await request(app)
+      .post("/livros")
+      .send({ titulo: "Livro para devolver", autor: "Autor", disponivel: true });
+
+    await request(app).post(`/livros/${criado.body.id}/emprestar`).send({ usuario: "Nathalia" });
+    const resposta = await request(app).post(`/livros/${criado.body.id}/devolver`);
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.disponivel).toBe(true);
+  });
+
+  test("retorna erro ao devolver livro inexistente", async () => {
+    const resposta = await request(app).post("/livros/999/devolver");
+
+    expect(resposta.status).toBe(404);
+  });
+
+  test("empresta sem informar usuario e usa o valor padrão", async () => {
+    const criado = await request(app)
+      .post("/livros")
+      .send({ titulo: "Livro sem usuario", autor: "Autor", disponivel: true });
+
+    await request(app).post(`/livros/${criado.body.id}/emprestar`);
+
+    const historico = await request(app).get(`/livros/${criado.body.id}/emprestimos`);
+    expect(historico.body[0].pegadoPor).toBe("não informado");
+  });
+
+  test("devolve um livro que não tinha empréstimo em aberto sem quebrar", async () => {
+    const criado = await request(app)
+      .post("/livros")
+      .send({ titulo: "Livro nunca emprestado", autor: "Autor", disponivel: false });
+
+    const resposta = await request(app).post(`/livros/${criado.body.id}/devolver`);
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.disponivel).toBe(true);
+  });
+});
+
+describe("GET /categorias", () => {
+  test("lista os gêneros já cadastrados", async () => {
+    const resposta = await request(app).get("/categorias");
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body).toContain("Suspense");
+    expect(resposta.body).toContain("Romance");
+  });
+});
+
+describe("GET /emprestimos", () => {
+  test("lista o histórico completo de empréstimos", async () => {
+    const criado = await request(app)
+      .post("/livros")
+      .send({ titulo: "Livro do histórico", autor: "Autor", disponivel: true });
+
+    await request(app).post(`/livros/${criado.body.id}/emprestar`).send({ usuario: "Nathalia" });
+
+    const resposta = await request(app).get("/emprestimos");
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.some(e => e.livroId === criado.body.id)).toBe(true);
+  });
+
+  test("lista o histórico de empréstimos de um livro específico", async () => {
+    const criado = await request(app)
+      .post("/livros")
+      .send({ titulo: "Livro do histórico individual", autor: "Autor", disponivel: true });
+
+    await request(app).post(`/livros/${criado.body.id}/emprestar`).send({ usuario: "Nathalia" });
+
+    const resposta = await request(app).get(`/livros/${criado.body.id}/emprestimos`);
+
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.length).toBe(1);
+    expect(resposta.body[0].pegadoPor).toBe("Nathalia");
+  });
 });
