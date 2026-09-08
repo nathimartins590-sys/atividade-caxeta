@@ -2,6 +2,7 @@ import express from "express";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./swagger.js";
 import emprestimos from "./repository/emprestimo.js";
+import { carregarLivros, salvarLivros } from "./repository/livro.js";
 
 const app = express();
 
@@ -10,22 +11,7 @@ app.use(express.json());
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 
-const livros = [
-    {
-        id : 1,
-        titulo: "O escaravelho do diabo",
-        autor: "Lucia Machado",
-        disponivel: true,
-        genero: "Suspense"
-    },
-    {
-        id : 2,
-        titulo: "E o vento levou",
-        autor: "Erico veríssimo",
-        disponivel: false,
-        genero: "Romance"
-    }
-]
+let livros = carregarLivros();
 
 function validarLivro(body) {
     const erros = [];
@@ -170,6 +156,7 @@ app.post('/livros', (req, res) => {
     };
 
     livros.push(novoLivro);
+    salvarLivros(livros);
 
     res.status(201).json(novoLivro);
 });
@@ -229,6 +216,8 @@ app.put('/livros/:id', (req, res) => {
         livro.genero = req.body.genero;
     }
 
+    salvarLivros(livros);
+
     res.status(200).json(livro);
 });
 
@@ -258,6 +247,7 @@ app.delete('/livros/:id', (req, res) => {
     }
 
     livros.splice(indice, 1);
+    salvarLivros(livros);
 
     res.status(204).send('');
 });
@@ -295,11 +285,11 @@ app.post('/livros/:id/emprestar', (req, res) => {
     const livro = livros.find(item => item.id === id);
 
     if (!livro) {
-        return res.status(404).json({ error: "Livro não encontrado" });
+        return res.status(404).json({ error: "Livro não foi encontrado" });
     }
 
     if (!livro.disponivel) {
-        return res.status(400).json({ error: "Livro indisponível para empréstimo" });
+        return res.status(400).json({ error: "Livro indisponível para ser empréstado" });
     }
 
     livro.disponivel = false;
@@ -310,6 +300,8 @@ app.post('/livros/:id/emprestar', (req, res) => {
         dataEmprestimo: new Date().toISOString(),
         dataDevolucao: null
     });
+
+    salvarLivros(livros);
 
     res.status(200).json(livro);
 });
@@ -336,7 +328,7 @@ app.post('/livros/:id/devolver', (req, res) => {
     const livro = livros.find(item => item.id === id);
 
     if (!livro) {
-        return res.status(404).json({ error: "Livro não encontrado" });
+        return res.status(404).json({ error: "Livro não foi encontrado" });
     }
 
     livro.disponivel = true;
@@ -345,6 +337,8 @@ app.post('/livros/:id/devolver', (req, res) => {
     if (registro) {
         registro.dataDevolucao = new Date().toISOString();
     }
+
+    salvarLivros(livros);
 
     res.status(200).json(livro);
 });
