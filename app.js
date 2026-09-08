@@ -1,6 +1,7 @@
 import express from "express";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./swagger.js";
+import emprestimos from "./repository/emprestimo.js";
 
 const app = express();
 
@@ -24,220 +25,97 @@ const livros = [
     }
 ]
 
-
 /**
  * @openapi
- * /livros:
- *   get:
- *     summary: Lista livros
- *     description: Retorna a lista de livros, com filtro opcional por título
- *     parameters:
- *       - in: query
- *         name: titulo
- *         required: false
- *         schema:
- *           type: string
- *         description: Filtra os livros pelo título
- *     responses:
- *       200:
- *         description: Lista de livros retornada com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                   titulo:
- *                     type: string
- *                   autor:
- *                     type: string
- *                   disponivel:
- *                     type: boolean
- */
-app.get('/livros', (req, res) =>{
-    const titulo = req.query?.titulo || null
-    let livrosFiltrados = null
-    if(titulo !== null){
-      livrosFiltrados = livros.filter(item => item.titulo.toLowerCase()
-                                                    .includes(titulo.toLowerCase()));
-    }
-
-    livrosFiltrados = livrosFiltrados ?? livros;
-    res.status(200).json(livrosFiltrados);
-});
-
-/**
- * @openapi
- * /livros/{id}:
- *   get:
- *     summary: Busca um livro pelo id
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Livro encontrado
- *       404:
- *         description: Livro não encontrado
- */
-app.get('/livros/:id', (req, res) =>{
-    const id = Number(req.params?.id);
-
-    const livro = livros.find(item => item.id === id);
-
-    if(!livro){
-        return res.status(404).json({error: "livro não foi encontrado"})
-    }
-
-    res.status(200).json(livro);
-
-});
-
-
-/**
- * @openapi
- * /livros:
+ * /livros/{id}/emprestar:
  *   post:
- *     summary: Cria um novo livro
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - titulo
- *               - autor
- *             properties:
- *               titulo:
- *                 type: string
- *               autor:
- *                 type: string
- *               disponivel:
- *                 type: boolean
- *                 example: true
- *     responses:
- *       201:
- *         description: Livro criado com sucesso
- *       400:
- *         description: Dados inválidos
- */
-app.post('/livros', (req, res)=>{
-
-    const titulo = req.body?.titulo || null;
-    const autor = req.body?.autor || null;
-
-      if(!autor){
-        return res.status(400).json({error: "Autor é obrigatório"})
-      }
-
-      if(!titulo){
-        return res.status(400).json({error: "Título é obrigatório"})
-      }
-
-        const novoLivro = {
-            id: livros.length + 1,
-            titulo : titulo,
-            autor : autor,
-            disponviel: req.body?.disponivel || false
-        }
-
-        livros.push(novoLivro);
-
-        res.status(201).json(novoLivro);
-
-});
-
-/**
- * @openapi
- * /livros/{id}:
- *   put:
- *     summary: Atualiza um livro pelo id
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               titulo:
- *                 type: string
- *                 example: Memórias Póstumas de Brás Cubas
- *               autor:
- *                 type: string
- *                 example: Machado de Assis
- *               disponivel:
- *                 type: boolean
- *                 example: false
+ *     summary: Empresta um livro
  *     responses:
  *       200:
- *         description: Livro atualizado com sucesso
+ *         description: Livro emprestado com sucesso
+ *       400:
+ *         description: Livro indisponível
  *       404:
  *         description: Livro não encontrado
  */
-app.put('/livros/:id', (req, res) => {
+app.post('/livros/:id/emprestar', (req, res) => {
     const id = Number(req.params.id);
     const livro = livros.find(item => item.id === id);
-    if(!livro){
-        return res.status(404).json({error: "Livro não foi encontrado"})
+
+    if (!livro) {
+        return res.status(404).json({ error: "Livro não encontrado" });
     }
 
-    if(req?.body?.titulo && req.body.titulo !== ""){
-        livro.titulo = req.body.titulo;
+    if (!livro.disponivel) {
+        return res.status(400).json({ error: "Livro indisponível para empréstimo" });
     }
 
-    if(req?.body?.autor && req.body.autor !== ""){
-        livro.autor = req.body.autor;
-    }
-
-    if(req?.body?.disponivel && req.body.disponivel !== ""){
-        livro.disponivel = req.body.disponivel;
-    }
-
-    res.status(200).json(livro)
+    livro.disponivel = false;
+    res.status(200).json(livro);
 });
 
-/**
- * @openapi
- * /livros/{id}:
- *   delete:
- *     summary: Exclui um livro pelo id
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       204:
- *         description: Livros excluido com sucesso
- *       404:
- *         description: Livros não encontrado
- */
-app.delete('/livros/:id', (req, res) =>{
+app.post('/livros/:id/devolver', (req, res) => {
     const id = Number(req.params.id);
-    const indice = livros.findIndex(item => item.id === id)
+    const livro = livros.find(item => item.id === id);
 
-    if(indice === -1){
-        return res.status(404).json({ error: "Livro não foi encontrado" })
+    if (!livro) {
+        return res.status(404).json({ error: "Livro não encontrado" });
     }
 
-    livros.splice(indice, 1);
+    livro.disponivel = true;
+    res.status(200).json(livro);
+});
 
-    res.status(204).send('')
+function validarLivro(body) {
+    const erros = [];
+    if (!body.titulo || body.titulo.trim() === "") erros.push("Título é obrigatório");
+    if (body.titulo && body.titulo.length > 200) erros.push("Título muito longo (máx 200 caracteres)");
+    if (!body.autor || body.autor.trim() === "") erros.push("Autor é obrigatório");
+    if (body.autor && body.autor.length > 100) erros.push("Autor muito longo (máx 100 caracteres)");
+    if (body.disponivel !== undefined && typeof body.disponivel !== "boolean") {
+        erros.push("Campo 'disponivel' deve ser booleano");
+    }
+    return erros;
+}
 
+app.get('/livros', (req, res) => {
+    let resultado = [...livros];
+    const { titulo, autor, disponivel, ordenar, pagina = 1, limite = 10 } = req.query;
+
+    if (titulo) resultado = resultado.filter(l => l.titulo.toLowerCase().includes(titulo.toLowerCase()));
+    if (autor) resultado = resultado.filter(l => l.autor.toLowerCase().includes(autor.toLowerCase()));
+    if (disponivel !== undefined) resultado = resultado.filter(l => String(l.disponivel) === disponivel);
+
+    if (ordenar === 'titulo') resultado.sort((a, b) => a.titulo.localeCompare(b.titulo));
+    if (ordenar === 'autor') resultado.sort((a, b) => a.autor.localeCompare(b.autor));
+
+    const inicio = (Number(pagina) - 1) * Number(limite);
+    const paginado = resultado.slice(inicio, inicio + Number(limite));
+
+    res.status(200).json(paginado);
+});
+
+app.get('/categorias', (req, res) => {
+    const generos = [...new Set(livros.map(l => l.genero).filter(Boolean))];
+    res.status(200).json(generos);
+});
+
+let emprestimos = [];
+
+emprestimos.push({
+    livroId: livro.id,
+    pegadoPor: req.body.usuario || "não informado",
+    dataEmprestimo: new Date().toISOString(),
+    dataDevolucao: null
+});
+
+app.get('/emprestimos', (req, res) => {
+    res.status(200).json(emprestimos);
+});
+
+app.get('/livros/:id/emprestimos', (req, res) => {
+    const id = Number(req.params.id);
+    res.status(200).json(emprestimos.filter(e => e.livroId === id));
 });
 
 export default app;
